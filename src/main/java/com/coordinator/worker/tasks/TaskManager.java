@@ -57,7 +57,7 @@ public class TaskManager {
 
   private void assignTaskByWorkers(String task, List<String> workersListPaths) throws Exception {
     if (StringUtils.isEmpty(task) || workersListPaths == null || workersListPaths.size() == 0) {
-      final String errorMessage = "Cannot assign task - illegal value for task  and/or workers list";
+      final String errorMessage = "Cannot assign task - illegal value for task  and/or workers list is null";
       log.error(errorMessage);
       throw new IllegalArgumentException(errorMessage);
     }

@@ -32,6 +32,7 @@ public class WorkerLatch extends BaseLatch {
   private TaskManager taskManager;
   private boolean runForMaster;
   private ZooKeeperChildrenEventCallback zooKeeperChildrenEventCallback;
+  private TaskDistributedAlgorithm taskDistributedAlgorithm;
 
   public WorkerLatch(String id, String basePath, CuratorFramework client, boolean runForMaster,
       TaskDistributedAlgorithm taskDistributedAlgorithm,
@@ -42,9 +43,9 @@ public class WorkerLatch extends BaseLatch {
     this.client = client;
     ZookeeperUtils.createNodeIfNotExists(client, this.basePath + Constants.LOCK_PATH);
     this.changeLock = new InterProcessSemaphoreMutex(client, this.basePath + Constants.LOCK_PATH);
-    this.taskManager = new TaskManager(basePath, client, taskDistributedAlgorithm);
     this.runForMaster = runForMaster;
     this.zooKeeperChildrenEventCallback = zooKeeperChildrenEventCallback;
+    this.taskDistributedAlgorithm=taskDistributedAlgorithm;
   }
 
 
@@ -131,6 +132,9 @@ public class WorkerLatch extends BaseLatch {
           "Exception when starting leadership - Failed to equire lock in order to become leader");
     }
     try {
+
+      this.taskManager = new TaskManager(basePath, client, taskDistributedAlgorithm);
+
       workersCache = CuratorCache
           .build(client, basePath + Constants.WORKERS_PATH);
       workersCache.listenable().addListener(workerListener());

@@ -25,22 +25,11 @@ public class CoordinatorManagerTest {
     zkServersIps.add( "127.0.0.1" );
     zookeeperProperties.setZkServersIps(zkServersIps);
     zookeeperProperties.setNamespace("coordinator");
-    TaskAssignmentCallback callback = new TaskAssignmentCallback() {
-      @Override
-      public void start(Task task) {
-        System.out.println("start----"+task);
-      }
 
-      @Override
-      public void stop(Task task) {
-        System.out.println("stop----"+task);
-      }
-    };
+    CoordinatorManager coordinatorManager=new CoordinatorManager(zookeeperProperties,
+       "/test");
 
-    CoordinatorManager coordinatorManager=new CoordinatorManager(zookeeperProperties,true,
-       "/test", new RandomTaskDistributionAlgorithm(),callback);
-
-    coordinatorManager.init();
+    coordinatorManager.registerMaster(new RandomTaskDistributionAlgorithm());
 
     TimeUnit.MINUTES.sleep(10);
     coordinatorManager.close();
@@ -53,10 +42,28 @@ public class CoordinatorManagerTest {
     zkServersIps.add( "127.0.0.1" );
     zookeeperProperties.setZkServersIps(zkServersIps);
     zookeeperProperties.setNamespace("coordinator");
+
+    CoordinatorManager coordinatorManager =new CoordinatorManager(zookeeperProperties,
+        "/test");
+
     TaskAssignmentCallback callback = new TaskAssignmentCallback() {
       @Override
       public void start(Task task) {
         System.out.println("start----"+task);
+        new Thread(()->{
+          try {
+            TimeUnit.SECONDS.sleep(30);
+          } catch (InterruptedException e) {
+            e.printStackTrace();
+          }
+          Map map= task.getMetaMap();
+          map.put("body2","value2");
+          try {
+            coordinatorManager.updateTask(task);
+          } catch (Exception exception) {
+            exception.printStackTrace();
+          }
+        }).start();
       }
 
       @Override
@@ -64,11 +71,7 @@ public class CoordinatorManagerTest {
         System.out.println("stop----"+task);
       }
     };
-
-    CoordinatorManager coordinatorManager=new CoordinatorManager(zookeeperProperties,false,
-        "/test", new RandomTaskDistributionAlgorithm(),callback);
-
-    coordinatorManager.init();
+    coordinatorManager.registerWorker(callback);
 
     TimeUnit.MINUTES.sleep(10);
     coordinatorManager.close();
@@ -94,15 +97,17 @@ public class CoordinatorManagerTest {
       }
     };
 
-    CoordinatorManager coordinatorManager=new CoordinatorManager(zookeeperProperties,true,
-        "/test", new RandomTaskDistributionAlgorithm(),callback);
+    CoordinatorManager coordinatorManager=new CoordinatorManager(zookeeperProperties,
+        "/test");
 
-    coordinatorManager.init();
+    coordinatorManager.registerMaster(new RandomTaskDistributionAlgorithm());
 
     Map map=new HashMap();
     map.put("id","test1");
     map.put("body","value");
-    Task task=new Task("test1",map);
+    Task task=new Task();
+    task.setId("test1");
+    task.setMetaMap(map);
     coordinatorManager.addTask(task);
 
 

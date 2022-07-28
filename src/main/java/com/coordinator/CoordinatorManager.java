@@ -36,45 +36,58 @@ public class CoordinatorManager {
 
 
   CoordinatorManager(ZookeeperProperties zookeeperProperties,
-      boolean runForMaster,String basePath, TaskDistributedAlgorithm taskDistributedAlgorithm,
-      TaskAssignmentCallback taskAssignmentCallback
+      String basePath
   ) throws Exception {
-
     this.id = IpUtil.getLocalIpByNetcard();
     this.client = ZookeeperService.init(zookeeperProperties.getZkServersIps(),
         zookeeperProperties.getNamespace(), zookeeperProperties.getUsername(),
         zookeeperProperties.getPassword());
     this.basePath=basePath;
+  }
 
+
+  public void registerMaster(TaskDistributedAlgorithm taskDistributedAlgorithm) throws Exception {
+    register(true,taskDistributedAlgorithm,null);
+  }
+
+  public void registerWorker(
+      TaskAssignmentCallback taskAssignmentCallback) throws Exception {
+    register(false,null,taskAssignmentCallback);
+  }
+
+  public void register(boolean runForMaster, TaskDistributedAlgorithm taskDistributedAlgorithm,
+      TaskAssignmentCallback taskAssignmentCallback) throws Exception {
     this.workerLatch = new WorkerLatch(this.id,this.basePath,client, runForMaster, taskDistributedAlgorithm,
         new ZooKeeperChildrenEventCallback() {
           @Override
           public void add(PathChildrenCacheEvent event) throws Exception {
-            String path=event.getData().getPath();
-            String metaData=new String (client.getData().forPath(path),StandardCharsets.UTF_8);
-            String id= StringUtils.substringAfterLast(path,"/");
-            Task task = new Task(id, gson.fromJson(metaData, Map.class));
+            Task task = parseTask(event);
             taskAssignmentCallback.start(task);
           }
 
           @Override
           public void remove(PathChildrenCacheEvent event) throws Exception {
-            String path=event.getData().getPath();
-            String metaData=new String (client.getData().forPath(path),StandardCharsets.UTF_8);
-            String id= StringUtils.substringAfterLast(path,"/");
-            Task task = new Task(id, gson.fromJson(metaData, Map.class));
+            Task task = parseTask(event);
             taskAssignmentCallback.stop(task);
           }
 
           @Override
           public void update(PathChildrenCacheEvent event) throws Exception {
-
+            System.out.println("update");
           }
         });
+    this.workerLatch.init();
   }
 
-  public void init() throws Exception {
-    this.workerLatch.init();
+  private Task parseTask(PathChildrenCacheEvent event) throws Exception {
+    String path = event.getData().getPath();
+    String metaData = new String(client.getData().forPath(path), StandardCharsets.UTF_8);
+    String id = StringUtils.substringAfterLast(path, "/");
+    Task task = new Task();
+    task.setId(id);
+    task.setMetaMap(gson.fromJson(metaData, Map.class));
+    task.setPath(path);
+    return task;
   }
 
   public void close(){
@@ -85,9 +98,15 @@ public class CoordinatorManager {
   public void addTask(Task task) throws Exception {
     log.debug( "Creating task for {} for scope {}", task);
     String path = this.basePath + "/tasks/"+ task.getId()+"-";
-    client.create().withProtection().withMode( CreateMode.PERSISTENT_SEQUENTIAL ).inBackground().forPath( path, gson.toJson(task.getMetaMap()).getBytes(
+    client.create().withProtection().withMode(CreateMode.PERSISTENT_SEQUENTIAL ).inBackground().forPath( path, gson.toJson(task.getMetaMap()).getBytes(
         StandardCharsets.UTF_8));
+  }
 
+
+  public void updateTask(Task task) throws Exception {
+    log.debug( "Creating task for {} for scope {}", task);
+    client.setData().inBackground().forPath( task.getPath(), gson.toJson(task.getMetaMap()).getBytes(
+        StandardCharsets.UTF_8));
   }
 
 }
